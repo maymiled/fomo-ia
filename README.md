@@ -1,12 +1,12 @@
 # FOMO IA
 
-Ma veille IA quotidienne, dans Claude Code. Hacker News, Bluesky, GitHub et arXiv sont résumés en un digest lisible en moins d'une minute, et chaque sujet peut être approfondi en un geste avec `/decrypte`. Construit pour ne plus jamais être larguée sur ce qui bouge dans le milieu (le nom est assumé).
+Ma veille IA quotidienne, dans Claude Code. Hacker News, Bluesky, GitHub et arXiv sont résumés en un digest lisible en moins d'une minute, chaque sujet peut être approfondi en un geste avec `/decrypte`, et une affirmation peut être vérifiée avec `/enquete`. Construit pour ne plus jamais être larguée sur ce qui bouge dans le milieu (le nom est assumé).
 
 ## Pourquoi ce projet
 
 **Un vrai besoin perso.** Suivre l'IA au jour le jour, c'est checker plusieurs sources à la main, chacune avec son bruit, et c'est la première chose qu'on laisse tomber quand on est chargé. FOMO IA me donne chaque jour l'essentiel, trié et résumé en français.
 
-**Un terrain d'apprentissage de l'écosystème Claude.** Plutôt que de lire la doc de chaque brique séparément, je voulais les manipuler toutes, ensemble, sur un projet qui me sert vraiment : serveur **MCP**, **Skills**, **sous-agents**, fichier **CLAUDE.md**, **spec-driven development** avec OpenSpec, specs **Gherkin**, **tests mockés**, **revue de code par IA** et **vibe coding**. Chaque brique a un rôle réel dans le projet, et chaque choix de conception est documenté (voir [`openspec/`](openspec/)).
+**Un terrain d'apprentissage de l'écosystème Claude.** Plutôt que de lire la doc de chaque brique séparément, je voulais les manipuler toutes, ensemble, sur un projet qui me sert vraiment : serveur **MCP**, **Skills**, **sous-agents**, **boucle agentique**, fichier **CLAUDE.md**, **spec-driven development** avec OpenSpec, specs **Gherkin**, **tests mockés**, **revue de code par IA** et **vibe coding**. Chaque brique a un rôle réel dans le projet, et chaque choix de conception est documenté (voir [`openspec/`](openspec/)).
 
 ## Ce que ça fait
 
@@ -28,6 +28,8 @@ Ma veille IA quotidienne, dans Claude Code. Hacker News, Bluesky, GitHub et arXi
 ```
 
 **`/decrypte Sonnet 5.5`** (ou `/decrypte le 3e HN`, `/decrypte <url>`, `/decrypte Labos d'IA` pour un thème) produit une explication pédagogique en 8 parties : en une phrase, contexte, ce qui est nouveau, pourquoi ça compte, limites et avis critique, 3 points à retenir, un lexique des mots compliqués, et les sources.
+
+**`/enquete Sonnet 5.5 est-il vraiment meilleur en code ?`** lance une enquête : Claude cherche et lit plusieurs sources, étape par étape, en annonçant chaque décision, puis rend un verdict (✅ Confirmé / 👍 Plutôt confirmé / ⚠️ Contesté / ❓ Pas assez d'éléments), avec les sources classées selon leur indépendance et le journal de l'enquête.
 
 ## Comment les briques s'articulent
 
@@ -51,6 +53,8 @@ Ma veille IA quotidienne, dans Claude Code. Hacker News, Bluesky, GitHub et arXi
                  ▼                                             │
      Claude trie par le sens, compose ───► digests/AAAA-MM-JJ.md ─┘
 ```
+
+`/enquete` réutilise le même sous-agent lecteur, mais dans une **boucle** : c'est ce que lit le lecteur qui décide de l'étape suivante (voir la brique 4).
 
 Le principe qui guide tout le projet : **le code fait ce qui doit être exact et testable** (récupérer, compter, trier par score, gérer les erreurs). **Le modèle fait ce qui demande du jugement** (dire si un titre parle d'IA, résumer, vulgariser).
 
@@ -109,13 +113,33 @@ Il renvoie des notes factuelles structurées (faits, chiffres, auteurs, limites,
 - **Le verrou `tools:` est une vraie garantie**, appliquée par Claude Code. En revanche, « le Claude principal ne lit pas lui-même », c'est une consigne de la skill : elle se vérifie dans le terminal, où l'on voit le bloc `lecteur-article` travailler.
 - Pas de sous-agent pour le digest quotidien : 4 appels rapides, un sous-agent n'y apporterait que du coût et de la latence.
 
-### 4. CLAUDE.md — [`CLAUDE.md`](CLAUDE.md)
+### 4. Boucle agentique — [`skills/enquete/SKILL.md`](skills/enquete/SKILL.md)
+
+**C'est quoi.** Une boucle *réfléchir → agir → observer* : au lieu de suivre une recette fixe, l'agent choisit à chaque tour l'action suivante **en fonction de ce qu'il vient de découvrir**, jusqu'à atteindre son but ou épuiser son budget. C'est ce qui distingue un agent d'un simple enchaînement d'appels.
+
+**Ici.** `/enquete` vérifie une affirmation :
+- **Préparer** : reformuler l'argument en question vérifiable, ou demander une précision s'il est trop vague.
+- **Boucler** avec deux actions seulement : `CHERCHER` (WebSearch) et `LIRE` (déléguée au sous-agent `lecteur-article`). Chaque étape est annoncée en direct :
+  `Étape 2/8 — Il me manque : une source indépendante → Je cherche « … » → J'observe : …`
+- **S'arrêter** au premier des trois cas :
+  - ✅ éléments suffisants : une source indépendante lue, et les avis contraires cherchés ;
+  - 🔁 deux étapes sans rien de nouveau ;
+  - ⏱️ budget de 8 étapes atteint, dont 5 lectures au plus. Une page déjà lue dans la conversation (par un `/decrypte`) n'est pas relue : ses notes sont réutilisées.
+- **Conclure** : un verdict, avec les sources classées 🏢 intéressée / 🔍 indépendante / 💬 communauté. **Pas de « Confirmé » sans source indépendante.**
+
+**Ce que j'en ai retenu.**
+- **Une boucle sans condition d'arrêt ni budget, c'est une facture ouverte.** Les garde-fous font partie de la conception, ce ne sont pas des détails.
+- **La boucle tourne volontairement dans la conversation principale**, et pas dans un sous-agent : on voit chaque décision, ce qui la rend compréhensible et vérifiable. Le prix à payer, ce sont environ 2 000 mots de notes dans le contexte, ce qui reste acceptable.
+- **L'honnêteté se programme** : la règle « pas de verdict positif sans source indépendante » empêche le modèle de confirmer une annonce à partir de la seule communication de celui qui l'annonce.
+- Ici, la boucle est **guidée par des consignes** : c'est Claude qui la mène. La version « écrite en code », une vraie boucle `while` avec le SDK Agent de Claude, est une piste pour comparer les deux approches.
+
+### 5. CLAUDE.md — [`CLAUDE.md`](CLAUDE.md)
 
 **C'est quoi.** Un fichier d'instructions que Claude Code lit automatiquement à chaque session dans ce dossier : commandes, structure et conventions du projet.
 
 **Ici.** Il fixe les règles que Claude doit respecter en modifiant le code : erreurs renvoyées comme données, zéro clé API, un test mocké pour chaque nouveau comportement, passage par OpenSpec avant tout changement de comportement, et tout en français.
 
-### 5. Spec-driven development avec OpenSpec — [`openspec/`](openspec/)
+### 6. Spec-driven development avec OpenSpec — [`openspec/`](openspec/)
 
 **C'est quoi.** [OpenSpec](https://openspec.dev/) formalise un cycle : **proposer** un changement (pourquoi, quoi, comment, tâches), l'**appliquer** tâche par tâche, puis l'**archiver**, ce qui fusionne ses exigences dans la spec officielle. Les exigences s'écrivent avec des scénarios `WHEN/THEN`, vérifiés par `openspec validate`.
 
@@ -127,24 +151,25 @@ Il renvoie des notes factuelles structurées (faits, chiffres, auteurs, limites,
 | `hn-semantic-filter` | Le filtre HN par mots-clés (qui ratait « LLMs », « Nvidia »…) remplacé par un tri sémantique fait par Claude |
 | `add-bluesky-source` | 4ᵉ source, liste d'experts et détection des « nouveaux visages » |
 | `add-decrypte-skill` | `/decrypte`, le sous-agent lecteur et l'enregistrement des digests |
+| `add-enquete-skill` | `/enquete`, la boucle agentique de vérification |
 
-Le comportement actuel est dans [`openspec/specs/`](openspec/specs/) (`fomo-briefing`, `decryptage`). Chaque `design.md` archivé garde les alternatives écartées et leurs raisons. Les commandes `/opsx:propose`, `/opsx:apply` et `/opsx:archive` sont fournies par `openspec init` (dans `.claude/`).
+Le comportement actuel est dans [`openspec/specs/`](openspec/specs/) (`fomo-briefing`, `decryptage`, `enquete`). Chaque `design.md` archivé garde les alternatives écartées et leurs raisons. Les commandes `/opsx:propose`, `/opsx:apply` et `/opsx:archive` sont fournies par `openspec init` (dans `.claude/`).
 
 **Ce que j'en ai retenu.** Écrire le « pourquoi » avant le code change les décisions. Par exemple, la première idée pour le filtre HN était d'ajouter les pluriels à une regex. En l'écrivant, il est devenu évident que c'était une course sans fin, et que le jugement devait revenir au modèle.
 
-### 6. Gherkin — [`spec/`](spec/)
+### 7. Gherkin — [`spec/`](spec/)
 
 Les mêmes comportements, écrits en `Given/When/Then` classique, lisibles sans connaître le code. Ils servent de documentation (aucun *step definition*, donc ils ne sont pas exécutés).
 
-### 7. Tests mockés — [`test_server.py`](test_server.py)
+### 8. Tests mockés — [`test_server.py`](test_server.py)
 
 15 tests `unittest` qui remplacent les APIs par de fausses réponses (`patch.object(server.requests, "get", ...)`). Ils vérifient le tri, les limites, le parsing et la gestion d'erreur, dont la règle « 3 experts distincts, pas 2, même avec 5 reposts ». Aucun appel réseau : ils tournent partout, en une fraction de seconde. Ce que le modèle décide (tri sémantique, rédaction) n'est pas mockable. C'est vérifié sur de vrais lancements, et noté comme tel dans les tâches OpenSpec.
 
-### 8. Revue de code par IA — [`REVIEW.md`](REVIEW.md)
+### 9. Revue de code par IA — [`REVIEW.md`](REVIEW.md)
 
 Le diff initial relu par Claude : une incohérence de gestion d'erreur entre les outils a été trouvée et corrigée, et des tests de non-régression ont été ajoutés. Les limites restantes sont documentées plutôt que cachées.
 
-### 9. Vibe coding
+### 10. Vibe coding
 
 Le projet est construit en conversation avec Claude Code : l'essentiel du code est généré et itéré directement, avec une vérification ciblée là où ça compte (gestion d'erreur, parsing, règles de comptage), des tests écrits avant le code, et un vrai lancement à la fin de chaque change.
 
@@ -159,6 +184,7 @@ skills/
   daily-ai-fomo-briefing/         skill du digest
     references/bluesky-accounts.md   experts Bluesky suivis
   decrypte/                       skill /decrypte
+  enquete/                        skill /enquete (boucle agentique)
 agents/lecteur-article.md         sous-agent de lecture (lecture seule)
 .claude/                          liens vers skills/ et agents/, plus les outils OpenSpec
 openspec/specs/                   comportement actuel (WHEN/THEN)
@@ -180,8 +206,9 @@ Claude Code détecte le serveur MCP via `.mcp.json` et demande une validation la
 
 - *« fais-moi le FOMO IA du jour »* → le digest, aussi enregistré dans `digests/AAAA-MM-JJ.md`
 - `/decrypte <titre | rang | url | thème>` → le décryptage d'un élément
+- `/enquete <affirmation ou question>` → une enquête qui croise les sources et rend un verdict
 
-`python server.py` seul ne semble rien faire : c'est normal, il attend un client MCP sur l'entrée standard. Pour Claude Desktop, déclarer le serveur dans sa config avec des chemins absolus (`/decrypte` n'y fonctionnera pas, faute de WebFetch).
+`python server.py` seul ne semble rien faire : c'est normal, il attend un client MCP sur l'entrée standard. Pour Claude Desktop, déclarer le serveur dans sa config avec des chemins absolus (`/decrypte` et `/enquete` n'y fonctionneront pas, faute de WebFetch et WebSearch).
 
 ## Tester
 
@@ -204,11 +231,12 @@ python -c "import server; print(server.get_recent_arxiv_papers(limit=2))"
 - Le tri des stories HN et des posts Bluesky est fait par Claude : plus fin qu'une liste de mots-clés, mais pas testable automatiquement et un peu variable d'un lancement à l'autre.
 - GitHub Search est appelé sans authentification : le rate limit est bas, suffisant pour un usage perso.
 - Bluesky : la recherche plein texte est fermée aux anonymes, d'où la liste d'experts. Un expert très actif peut occuper plusieurs places dans la section.
-- `/decrypte` dépend de WebFetch (Claude Code). Un article derrière un paywall est signalé, pas deviné.
+- `/decrypte` et `/enquete` dépendent de WebFetch et WebSearch (Claude Code). Un article derrière un paywall est signalé, pas deviné.
+- `/enquete` consomme plus qu'un décryptage (jusqu'à 5 lectures par sous-agent), d'où le budget de 8 étapes. Sur une actualité très fraîche, « Pas assez d'éléments » est un résultat normal.
 
 ## Pistes
 
 - Lancer le digest automatiquement (GitHub Actions, avec une *issue* comme notification), plutôt en déclenchement manuel que tous les jours, pour ne pas consommer inutilement.
 - Limiter le nombre de posts par expert dans la section Bluesky.
 - Un token GitHub optionnel pour relever le rate limit.
-- Un exemple de vraie boucle agentique (reason → act → observe) : c'est l'objet de mon autre projet, [RunCrew Coach IA](https://github.com/maymiled), un agent Claude Haiku avec MCP.
+- Une version de `/enquete` où la boucle est écrite en Python avec le SDK Agent de Claude, pour comparer « boucle guidée par des consignes » et « boucle écrite en code ». Un autre exemple de boucle agentique : mon projet [RunCrew Coach IA](https://github.com/maymiled), un agent Claude Haiku avec MCP.

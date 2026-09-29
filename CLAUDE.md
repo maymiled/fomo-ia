@@ -21,7 +21,8 @@ Le serveur MCP est déclaré dans `.mcp.json` (chemins relatifs : lancer `claude
 - `test_server.py` : unittest + `patch.object(server.requests, "get", ...)`. Aucun test ne doit faire d'appel réseau réel.
 - `skills/daily-ai-fomo-briefing/` : la skill (source). `references/bluesky-accounts.md` = comptes Bluesky suivis, lus par la skill et passés à `get_bluesky_buzz`. `.claude/skills/daily-ai-fomo-briefing` est un lien symbolique vers ce dossier, ne pas le dupliquer. Étape finale : enregistre le digest dans `digests/AAAA-MM-JJ.md` (ignoré par Git).
 - `skills/decrypte/` : skill `/decrypte` (explique un élément du digest). Elle délègue la lecture à `agents/lecteur-article.md`, un sous-agent en lecture seule (`tools: WebFetch, Read`). Même principe de liens : `.claude/skills/decrypte`, `.claude/agents/lecteur-article.md`. Il faut relancer Claude Code pour qu'une nouvelle skill ou un nouvel agent soit découvert.
-- `openspec/specs/` : specs courantes (WHEN/THEN) : `fomo-briefing`, `decryptage`. `openspec/changes/archive/` : changes terminés (proposal, design, tasks), avec l'historique des décisions.
+- `skills/enquete/` : skill `/enquete`, une boucle agentique (CHERCHER via WebSearch / LIRE via `lecteur-article`), avec un budget de 8 étapes dont 5 lectures au plus et 3 conditions d'arrêt. Lien : `.claude/skills/enquete`.
+- `openspec/specs/` : specs courantes (WHEN/THEN) : `fomo-briefing`, `decryptage`, `enquete`. `openspec/changes/archive/` : changes terminés (proposal, design, tasks), avec l'historique des décisions.
 - `spec/*.feature` : mêmes comportements en Gherkin (documentation, non exécuté).
 - `.claude/skills/openspec-*`, `.claude/commands/opsx/` : générés par `openspec init`, ne pas modifier à la main.
 
