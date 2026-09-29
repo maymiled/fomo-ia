@@ -1,0 +1,16 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+
+# Le dossier .claude/ ci-dessous est généré automatiquement par `openspec init`
+# (les skills/commandes internes d'OpenSpec, pas du code à toi). Tu peux le
+# garder pour que le workflow OpenSpec marche direct chez toi, ou le retirer
+# du repo si tu préfères un historique Git qui ne montre que ton propre code :
+# .claude/
+
+# Digests générés chaque jour par la skill FOMO : contenu perso, pas du code.
+digests/
+
+# Réglages propres à cette machine (convention Claude Code : ne pas publier).
+.claude/settings.local.json

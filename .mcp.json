@@ -1,0 +1,8 @@
+{
+  "mcpServers": {
+    "fomo-ia": {
+      "command": ".venv/bin/python",
+      "args": ["server.py"]
+    }
+  }
+}
